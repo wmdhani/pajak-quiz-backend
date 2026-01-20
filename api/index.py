@@ -10,6 +10,7 @@ from groq import Groq
 app = FastAPI()
 
 # Inisialisasi Client Groq
+# Pastikan API KEY sudah diset di Environment Variable Vercel
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # CORS (Agar Frontend bisa akses)
@@ -20,7 +21,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- FUNGSI PDF READER (PINDAHAN DARI PROCESSOR.PY) ---
+# --- FUNGSI PDF READER (Menyatu di sini) ---
 def extract_random_context(pdf_path, num_pages=5):
     try:
         # Cek apakah file ada
@@ -55,6 +56,9 @@ async def generate_quiz(jumlah: int):
     try:
         # 1. Cari Lokasi PDF (Path Absolut - Wajib di Vercel)
         base_dir = os.path.dirname(os.path.realpath(__file__))
+        
+        # Pastikan nama file PDF Anda benar (huruf besar/kecil berpengaruh di Linux/Vercel)
+        # Jika nama file aslinya "Materi.pdf", ganti di bawah ini jadi "Materi.pdf"
         pdf_path = os.path.join(base_dir, "materi.pdf") 
 
         # 2. Baca PDF
