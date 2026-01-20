@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DJP Quiz Ukom</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: { sans: ["Inter", "sans-serif"] },
+            colors: { djp: { blue: "#0A2558", yellow: "#FFD700" } },
+            animation: { "fade-in": "fadeIn 0.5s ease-out" },
+            keyframes: {
+              fadeIn: {
+                "0%": { opacity: "0", transform: "translateY(10px)" },
+                "100%": { opacity: "1", transform: "translateY(0)" },
+              },
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+    </style>
+  </head>
+  <body
+    class="bg-slate-100 min-h-screen flex items-center justify-center p-4 text-slate-800"
+  >
+    <div
+      class="w-full max-w-2xl bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 min-h-[500px] flex flex-col"
+    >
+      <div
+        class="bg-djp-blue p-5 text-white flex justify-between items-center shadow-md"
+      >
+        <div>
+          <h1 class="text-lg font-bold flex items-center gap-2">
+            <svg
+              class="w-6 h-6 text-djp-yellow"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              ></path>
+            </svg>
+            DJP Quiz AI
+          </h1>
+          <p class="text-[10px] text-blue-200">Powered by Groq Llama 3.3</p>
+        </div>
+        <div
+          id="score-badge"
+          class="hidden bg-white/10 px-3 py-1 rounded-lg backdrop-blur-sm"
+        >
+          <div
+            class="text-xl font-bold text-djp-yellow text-center"
+            id="current-score"
+          >
+            0
+          </div>
+        </div>
+      </div>
+
+      <div class="flex-1 p-6 relative flex flex-col justify-center">
+        <div id="setup-screen" class="text-center space-y-6 animate-fade-in">
+          <div
+            class="bg-blue-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto ring-4 ring-blue-100"
+          >
+            <svg
+              class="w-10 h-10 text-djp-blue"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+              ></path>
+            </svg>
+          </div>
+          <h2 class="text-2xl font-bold">Uji Kompetensi</h2>
+          <p class="text-sm text-slate-500">
+            Generate soal otomatis dari materi PDF.
+          </p>
+          <div class="max-w-xs mx-auto space-y-4">
+            <select
+              id="question-count"
+              aria-label="Pilih Jumlah Soal"
+              class="w-full bg-slate-50 border p-3 rounded-lg text-sm font-medium"
+            >
+              <option value="10">10 Soal (Latihan)</option>
+              <option value="20">20 Soal (Serius)</option>
+            </select>
+            <button
+              onclick="startQuiz()"
+              class="w-full bg-djp-blue hover:bg-blue-800 text-white font-bold py-3 rounded-xl shadow-lg transition-all"
+            >
+              Mulai
+            </button>
+          </div>
+        </div>
+
+        <div
+          id="loading-screen"
+          class="hidden text-center py-10 animate-fade-in"
+        >
+          <div
+            class="w-16 h-16 border-4 border-blue-100 border-t-djp-blue rounded-full animate-spin mx-auto mb-4"
+          ></div>
+          <h3 class="font-bold">Memproses Materi...</h3>
+          <p class="text-xs text-slate-400 mt-2">Mohon tunggu sebentar</p>
+        </div>
+
+        <div id="quiz-screen" class="hidden h-full animate-fade-in">
+          <div class="w-full bg-slate-100 rounded-full h-2 mb-4">
+            <div
+              id="progress-bar"
+              class="bg-djp-blue h-2 rounded-full transition-all duration-500 w-0"
+            ></div>
+          </div>
+          <p
+            class="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider"
+            id="question-number"
+          >
+            SOAL 1
+          </p>
+          <h2
+            id="question-text"
+            class="text-lg font-semibold mb-6 leading-relaxed"
+          >
+            ...
+          </h2>
+          <div id="options-container" class="space-y-3"></div>
+        </div>
+
+        <div
+          id="result-screen"
+          class="hidden text-center space-y-6 animate-fade-in py-6"
+        >
+          <h2 class="text-3xl font-bold text-djp-blue" id="final-score-display">
+            0
+          </h2>
+          <p class="text-slate-500">Skor Akhir Anda</p>
+          <button
+            onclick="location.reload()"
+            class="w-full bg-djp-blue text-white font-bold py-3 rounded-xl shadow-lg"
+          >
+            Ulangi
+          </button>
+        </div>
+      </div>
+
+      <div
+        class="bg-slate-50 p-2 text-center border-t text-[10px] text-slate-400 font-mono"
+      >
+        MyMed Tools • KPP Madya Medan
+      </div>
+    </div>
+
+    <script>
+      const API_BASE_URL = "";
+      let quizData = [],
+        curr = 0,
+        score = 0,
+        busy = false;
+
+      const el = (id) => document.getElementById(id);
+      const switchScreen = (id) => {
+        [
+          "setup-screen",
+          "loading-screen",
+          "quiz-screen",
+          "result-screen",
+        ].forEach((s) => el(s).classList.add("hidden"));
+        el(id).classList.remove("hidden");
+      };
+
+      async function startQuiz() {
+        const count = el("question-count").value;
+        switchScreen("loading-screen");
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/generate-quiz/${count}`);
+          const json = await res.json();
+          if (json.status === "success") {
+            quizData = json.data;
+            curr = 0;
+            score = 0;
+            el("current-score").innerText = 0;
+            el("score-badge").classList.remove("hidden");
+            switchScreen("quiz-screen");
+            renderQuestion();
+          } else throw new Error(json.message);
+        } catch (e) {
+          alert("Gagal: " + e.message);
+          location.reload();
+        }
+      }
+
+      function renderQuestion() {
+        const q = quizData[curr];
+        el("question-number").innerText = `SOAL ${curr + 1}/${quizData.length}`;
+        el("progress-bar").style.width = `${(curr / quizData.length) * 100}%`;
+        el("question-text").innerText = q.question;
+
+        const cont = el("options-container");
+        cont.innerHTML = "";
+        busy = false;
+
+        q.options.forEach((opt) => {
+          const letter = opt.charAt(0);
+          const btn = document.createElement("button");
+          btn.className =
+            "w-full text-left p-4 rounded-xl border border-slate-200 bg-white hover:bg-blue-50 transition-all flex gap-3";
+          btn.onclick = () => answer(letter, btn);
+          btn.innerHTML = `<span class="font-bold text-slate-500 bg-slate-100 w-6 h-6 flex items-center justify-center rounded-full text-xs">${letter}</span> <span class="text-sm">${opt.substring(2)}</span>`;
+          cont.appendChild(btn);
+        });
+      }
+
+      function answer(choice, btn) {
+        if (busy) return;
+        busy = true;
+        const correct = quizData[curr].answer;
+        const isRight = choice === correct;
+
+        if (isRight) {
+          score++;
+          el("current-score").innerText = score;
+          btn.className = btn.className.replace(
+            "bg-white",
+            "bg-green-100 border-green-500",
+          );
+        } else {
+          btn.className = btn.className.replace(
+            "bg-white",
+            "bg-red-100 border-red-500",
+          );
+          // Highlight correct
+          Array.from(el("options-container").children).forEach((b) => {
+            if (b.innerText.includes(correct + "."))
+              b.className = b.className.replace(
+                "bg-white",
+                "bg-green-100 border-green-500",
+              );
+          });
+        }
+
+        setTimeout(() => {
+          curr++;
+          if (curr < quizData.length) renderQuestion();
+          else finish();
+        }, 1000);
+      }
+
+      function finish() {
+        switchScreen("result-screen");
+        el("score-badge").classList.add("hidden");
+        const final = Math.round((score / quizData.length) * 100);
+        el("final-score-display").innerText = final;
+        if (final >= 80)
+          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+      }
+
+      // Security
+      document.addEventListener("contextmenu", (e) => e.preventDefault());
+      document.onkeydown = (e) => {
+        if (
+          e.key == "F12" ||
+          (e.ctrlKey && "UIJCS".includes(e.key.toUpperCase()))
+        )
+          return false;
+      };
+    </script>
+  </body>
+</html>
