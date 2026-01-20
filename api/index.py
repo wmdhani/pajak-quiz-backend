@@ -1,15 +1,16 @@
 import os
 import json
+import random
+import fitz  # PyMuPDF
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from groq import Groq
-from processor import extract_random_context
 
-# Inisialisasi
+# --- KONFIGURASI ---
 app = FastAPI()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# CORS
+# CORS (Agar Frontend bisa akses)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,20 +18,53 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/generate-quiz/{jumlah}")
+# --- FUNGSI PDF READER (PINDAHAN DARI PROCESSOR.PY) ---
+def extract_random_context(pdf_path, num_pages=5):
+    try:
+        if not os.path.exists(pdf_path):
+            print(f"Error: File PDF tidak ditemukan di {pdf_path}")
+            return ""
+            
+        doc = fitz.open(pdf_path)
+        total_pages = len(doc)
+        
+        # Ambil halaman secara acak
+        num_pages = min(num_pages, total_pages)
+        random_pages = random.sample(range(total_pages), num_pages)
+        
+        text_list = []
+        for p in random_pages:
+            # Bungkus str() untuk keamanan tipe data
+            text = str(doc[p].get_text("text"))
+            if text.strip():
+                text_list.append(text)
+                
+        doc.close()
+        return " ".join(text_list)
+    except Exception as e:
+        print(f"PDF Processing Error: {str(e)}")
+        return ""
+
+# --- ENDPOINT UTAMA ---
+@app.get("/api/generate-quiz/{jumlah}") # Penting: Tambah /api/ di depan agar sesuai routing
 async def generate_quiz(jumlah: int):
     try:
-        # FIX VERCEL: Gunakan path absolut agar PDF selalu ketemu
+        # 1. Cari Lokasi PDF (Path Absolut)
         base_dir = os.path.dirname(os.path.realpath(__file__))
-        pdf_path = os.path.join(base_dir, "materi.pdf") # Pastikan nama file PDF Anda 'materi.pdf'
+        pdf_path = os.path.join(base_dir, "materi.pdf") 
 
+        # 2. Baca PDF
         context = extract_random_context(pdf_path, num_pages=3)
         if not context:
-            return {"status": "error", "message": "Gagal membaca PDF."}
+            return {
+                "status": "error", 
+                "message": "Gagal membaca PDF. Pastikan file 'materi.pdf' ada di folder 'api' dan tidak corrupt."
+            }
             
+        # 3. Kirim ke AI
         prompt = f"""
         Role: Ahli Pajak DJP.
-        Tugas: Buat {jumlah} soal pilihan ganda (A-E) sulit & menjebak dari materi ini.
+        Tugas: Buat {jumlah} soal pilihan ganda (A-E) tingkat sulit dari materi ini.
         
         Materi: {context[:8000]}
         
@@ -50,14 +84,19 @@ async def generate_quiz(jumlah: int):
             temperature=0.5
         )
         
-        # Bersihkan JSON
-        raw = chat.choices[0].message.content or "" 
-        
+        # 4. Bersihkan Respons JSON
+        raw = chat.choices[0].message.content or ""
         clean = raw.replace("```json", "").replace("```", "").strip()
+        
+        # Ambil hanya bagian array [...]
         if "[" in clean and "]" in clean:
             clean = clean[clean.find('['):clean.rfind(']')+1]
             
         return {"status": "success", "data": json.loads(clean)}
 
     except Exception as e:
+        print(f"Server Error: {str(e)}")
         return {"status": "error", "message": str(e)}
+
+# Handler untuk Vercel (Penting!)
+# Vercel mencari variable 'app' di file ini, jadi kode di atas sudah cukup.
